@@ -5,17 +5,41 @@
 from asyncio import sleep
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ForceReply, CallbackQuery
-from pyrogram.errors import FloodWait
+from pyrogram.errors import *
 import humanize
 import random
 from helper.txt import mr
 from helper.database import db
-from config import START_PIC, FLOOD, ADMIN, VERIFY, VERIFY_TUTORIAL, BOT_USERNAME
+from config import AUTH_CHANNEL, START_PIC, FLOOD, ADMIN, VERIFY, VERIFY_TUTORIAL, BOT_USERNAME
 from utils import verify_user, check_token, check_verification, get_token
 
+async def is_subscribed(bot, query, channel):
+    btn = []
+    for id in channel:
+        chat = await bot.get_chat(int(id))
+        try:
+            await bot.get_chat_member(id, query.from_user.id)
+        except UserNotParticipant:
+            btn.append([InlineKeyboardButton(f'Join {chat.title}', url=chat.invite_link)])
+        except Exception as e:
+            pass
+    return btn
 
 @Client.on_message(filters.private & filters.command(["start"]))
 async def start(client, message):
+    if AUTH_CHANNEL:
+        try:
+            btn = await is_subscribed(client, message, AUTH_CHANNEL)
+            if btn:
+                username = (await client.get_me()).username
+                if message.command[1]:
+                    btn.append([InlineKeyboardButton("♻️ Try Again ♻️", url=f"https://t.me/{username}?start={message.command[1]}")])
+                else:
+                    btn.append([InlineKeyboardButton("♻️ Try Again ♻️", url=f"https://t.me/{username}?start=true")])
+                await message.reply_text(text=f"<b>👋 Hello {message.from_user.mention},\n\nPlease join the channel then click on try again button. 😇</b>", reply_markup=InlineKeyboardMarkup(btn))
+                return
+        except Exception as e:
+            print(e)
     user = message.from_user
     if not await db.is_user_exist(user.id):
         await db.add_user(user.id)             
